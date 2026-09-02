@@ -38,6 +38,13 @@ export default function CleanStoragePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [viewingJson, setViewingJson] = useState<{ name: string; content: string } | null>(null);
+  const [storageInfo, setStorageInfo] = useState<{
+    provider: "cloudinary" | "local";
+    location: string;
+  }>({
+    provider: "local",
+    location: "public/output/",
+  });
 
   // Modal & Toast States
   const [alertModal, setAlertModal] = useState<{
@@ -123,6 +130,12 @@ export default function CleanStoragePage() {
       const data = await res.json();
       if (res.ok) {
         setFiles(data.files || []);
+        if (data.storageProvider) {
+          setStorageInfo({
+            provider: data.storageProvider,
+            location: data.storageLocation || (data.storageProvider === "cloudinary" ? "Cloudinary (web-scrape/outputs/)" : "public/output/"),
+          });
+        }
       }
     } catch (err: any) {
       showToast(`Gagal memuat file output: ${err.message}`, "error");
@@ -340,8 +353,9 @@ export default function CleanStoragePage() {
                   <h2 className="text-sm font-bold text-slate-900">
                     Status Direktori Storage
                   </h2>
-                  <p className="text-xs text-slate-500 font-mono">
-                    Lokasi: public/output/
+                  <p className="text-xs text-slate-500 font-mono flex items-center gap-1.5 mt-0.5">
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${storageInfo.provider === "cloudinary" ? "bg-emerald-500 animate-pulse" : "bg-sky-500"}`}></span>
+                    Lokasi: {storageInfo.location}
                   </p>
                 </div>
               </div>

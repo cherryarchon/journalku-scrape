@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
-import { saveRawResult } from "@/lib/scraper/engine";
+import { saveScrapeResult } from "@/lib/storage";
 
 export const maxDuration = 300;
 
@@ -62,18 +62,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // Save output locally or in /tmp (on Vercel)
+    // Save output to Cloudinary (or local storage fallback)
     let savedFile: string | null = null;
+    let storageProvider: string = "local";
+    let cloudUrl: string | undefined;
+
     try {
-      savedFile = saveRawResult(responseData, parseInt(batchSize, 10), customOutputName);
+      const saveResult = await saveScrapeResult(responseData, parseInt(batchSize, 10), customOutputName);
+      savedFile = saveResult.savedFile;
+      storageProvider = saveResult.storageProvider;
+      cloudUrl = saveResult.url;
     } catch (saveErr: any) {
-      console.warn("Peringatan: Gagal menyimpan file output ke disk:", saveErr?.message || saveErr);
+      console.warn("Peringatan: Gagal menyimpan file output:", saveErr?.message || saveErr);
     }
 
     return NextResponse.json({
       success: true,
       data: responseData,
       savedFile,
+      storageProvider,
+      url: cloudUrl,
     });
   } catch (error: any) {
     return NextResponse.json(

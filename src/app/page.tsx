@@ -42,6 +42,8 @@ interface OutputFile {
   sizeBytes: number;
   updatedAt: string;
   itemCount: number;
+  url?: string;
+  storageProvider?: "cloudinary" | "local";
 }
 
 interface ServerStatus {
@@ -121,6 +123,13 @@ export default function ScraperDashboard() {
   const [viewingJson, setViewingJson] = useState<{ name: string; content: string } | null>(null);
   const [selectedFileNames, setSelectedFileNames] = useState<string[]>([]);
   const [isZipLoading, setIsZipLoading] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<{
+    provider: "cloudinary" | "local";
+    location: string;
+  }>({
+    provider: "local",
+    location: "public/output/",
+  });
 
   // Modal & Toast States
   const [alertModal, setAlertModal] = useState<{
@@ -294,6 +303,12 @@ export default function ScraperDashboard() {
       const data = await res.json();
       if (res.ok) {
         setOutputFiles(data.files || []);
+        if (data.storageProvider) {
+          setStorageInfo({
+            provider: data.storageProvider,
+            location: data.storageLocation || (data.storageProvider === "cloudinary" ? "Cloudinary (web-scrape/outputs/)" : "public/output/"),
+          });
+        }
       }
     } catch (err) {
       console.error("Gagal mengambil file output:", err);
@@ -1757,10 +1772,17 @@ export default function ScraperDashboard() {
                     <FolderArchive className="w-5 h-5 text-sky-600" />
                     Manajemen File Output (.json & .zip)
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">
-                    File tersimpan mandiri di <code className="text-sky-700 font-mono bg-sky-50 px-1 py-0.5 rounded">public/output/</code>.
-                    Batas download individual: 20 file, atau hingga 100 file dikompresi menjadi format{" "}
-                    <strong>.zip</strong>.
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+                    <span>File tersimpan di</span>
+                    <span className={`inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                      storageInfo.provider === "cloudinary"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-sky-50 text-sky-700 border border-sky-200"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${storageInfo.provider === "cloudinary" ? "bg-emerald-500 animate-pulse" : "bg-sky-500"}`}></span>
+                      {storageInfo.location}
+                    </span>
+                    <span>• Batas individual: 20 file, atau ZIP s/d 100 file.</span>
                   </p>
                 </div>
 
@@ -1823,7 +1845,7 @@ export default function ScraperDashboard() {
               ) : outputFiles.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
                   <FolderArchive className="w-12 h-12 stroke-1 mb-2 opacity-40 text-slate-400 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Belum ada file JSON di folder public/output/</p>
+                  <p className="text-sm font-semibold text-slate-700">Belum ada file JSON di {storageInfo.location}</p>
                   <p className="text-xs text-slate-500 mt-1">
                     Lakukan scraping single atau batch untuk membuat file output.
                   </p>

@@ -1,7 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
-import fs from "fs";
-import path from "path";
-import { getOutputDir } from "@/lib/scraper/engine";
+import { getOutputFileBuffer, deleteSingleOutputFile } from "@/lib/storage";
 
 export async function GET(
   req: NextRequest,
@@ -9,22 +7,19 @@ export async function GET(
 ) {
   try {
     const { filename } = await context.params;
-    const outputDir = getOutputDir();
-    const filePath = path.join(outputDir, filename);
+    const fileResult = await getOutputFileBuffer(filename);
 
-    if (!fs.existsSync(filePath) || !filename.endsWith(".json")) {
+    if (!fileResult) {
       return NextResponse.json(
         { error: "File tidak ditemukan" },
         { status: 404 }
       );
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
-
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(fileResult.buffer as unknown as BodyInit, {
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Type": fileResult.contentType,
+        "Content-Disposition": `attachment; filename="${fileResult.filename}"`,
       },
     });
   } catch (error: any) {
@@ -41,16 +36,14 @@ export async function DELETE(
 ) {
   try {
     const { filename } = await context.params;
-    const outputDir = getOutputDir();
-    const filePath = path.join(outputDir, filename);
+    const deleted = await deleteSingleOutputFile(filename);
 
-    if (fs.existsSync(filePath) && filename.endsWith(".json")) {
-      fs.unlinkSync(filePath);
-      return NextResponse.json({ success: true });
+    if (deleted) {
+      return NextResponse.json({ success: true, filename });
     }
 
     return NextResponse.json(
-      { error: "File tidak ditemukan" },
+      { error: "File tidak ditemukan atau gagal dihapus" },
       { status: 404 }
     );
   } catch (error: any) {
