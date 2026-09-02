@@ -781,7 +781,7 @@ export default function ScraperDashboard() {
 
     showConfirm({
       title: "Bersihkan Seluruh Storage Output",
-      message: `PERINGATAN: Anda akan menghapus SELURUH (${outputFiles.length}) file output di folder web-scrape/output/.`,
+      message: `PERINGATAN: Anda akan menghapus SELURUH (${outputFiles.length}) file output di folder public/output/.`,
       details: [
         `Jumlah file yang akan dihapus: ${outputFiles.length} file`,
         "Tindakan ini akan mengosongkan kapasitas storage server secara permanen.",
@@ -1560,7 +1560,7 @@ export default function ScraperDashboard() {
                               <Search className="w-12 h-12 stroke-1 mb-3 opacity-40 text-slate-400" />
                               <p className="text-sm font-semibold text-slate-700">Masukkan SINTA URL dan klik &quot;Mulai Scraping&quot;</p>
                               <p className="text-xs text-slate-500 mt-1">
-                                Hasil JSON dari Python Backend akan disimpan di folder web-scrape/output/
+                                Hasil JSON dari Python Backend akan disimpan di folder public/output/
                               </p>
                             </div>
                           )
@@ -1758,7 +1758,7 @@ export default function ScraperDashboard() {
                     Manajemen File Output (.json & .zip)
                   </h2>
                   <p className="text-xs text-slate-500 mt-1">
-                    File tersimpan mandiri di <code className="text-sky-700 font-mono bg-sky-50 px-1 py-0.5 rounded">web-scrape/output/</code>.
+                    File tersimpan mandiri di <code className="text-sky-700 font-mono bg-sky-50 px-1 py-0.5 rounded">public/output/</code>.
                     Batas download individual: 20 file, atau hingga 100 file dikompresi menjadi format{" "}
                     <strong>.zip</strong>.
                   </p>
@@ -1823,7 +1823,7 @@ export default function ScraperDashboard() {
               ) : outputFiles.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
                   <FolderArchive className="w-12 h-12 stroke-1 mb-2 opacity-40 text-slate-400 mx-auto" />
-                  <p className="text-sm font-semibold text-slate-700">Belum ada file JSON di folder web-scrape/output/</p>
+                  <p className="text-sm font-semibold text-slate-700">Belum ada file JSON di folder public/output/</p>
                   <p className="text-xs text-slate-500 mt-1">
                     Lakukan scraping single atau batch untuk membuat file output.
                   </p>

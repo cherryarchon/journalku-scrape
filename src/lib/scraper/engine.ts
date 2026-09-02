@@ -11,8 +11,8 @@ export interface ScrapeOptions {
 }
 
 export function getOutputDir(): string {
-  // Completely standalone output folder inside web-scrape/output
-  const localOutputDir = path.resolve(process.cwd(), "output");
+  // Output folder inside public/output
+  const localOutputDir = path.resolve(process.cwd(), "public", "output");
   if (!fs.existsSync(localOutputDir)) {
     fs.mkdirSync(localOutputDir, { recursive: true });
   }
@@ -35,9 +35,9 @@ export function saveRawResult(
   }
 
   let existing: any[] = [];
-  if (fs.existsSync(targetFile)) {
+  if (fs.existsSync(/*turbopackIgnore: true*/ targetFile)) {
     try {
-      const content = fs.readFileSync(targetFile, "utf-8");
+      const content = fs.readFileSync(/*turbopackIgnore: true*/ targetFile, "utf-8");
       existing = JSON.parse(content);
       if (!Array.isArray(existing)) {
         existing = [];

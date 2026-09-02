@@ -141,7 +141,7 @@ export default function CleanStoragePage() {
 
     showConfirm({
       title: "Bersihkan Seluruh Storage Output",
-      message: `PERINGATAN: Anda akan menghapus SELURUH (${files.length}) file output di folder web-scrape/output/.`,
+      message: `PERINGATAN: Anda akan menghapus SELURUH (${files.length}) file output di folder public/output/.`,
       details: [
         `Jumlah file yang akan dihapus: ${files.length} file`,
         "Tindakan ini akan mengosongkan kapasitas storage server secara permanen.",
@@ -341,7 +341,7 @@ export default function CleanStoragePage() {
                     Status Direktori Storage
                   </h2>
                   <p className="text-xs text-slate-500 font-mono">
-                    Lokasi: web-scrape/output/
+                    Lokasi: public/output/
                   </p>
                 </div>
               </div>

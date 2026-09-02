@@ -82,6 +82,6 @@ export async function GET(req: Request) {
     endpoint: "/api/outputs/cleanup",
     supportedMethods: ["DELETE", "POST", "GET?action=execute"],
     currentFilesCount: fileCount,
-    description: "Endpoint khusus untuk menghapus seluruh file JSON dan ZIP di direktori web-scrape/output/",
+    description: "Endpoint khusus untuk menghapus seluruh file JSON dan ZIP di direktori public/output/",
   });
 }

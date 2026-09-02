@@ -62,7 +62,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Save output locally in web-scrape/output/
+    // Save output in public/output/
     const savedFile = saveRawResult(responseData, parseInt(batchSize, 10), customOutputName);
 
     return NextResponse.json({
