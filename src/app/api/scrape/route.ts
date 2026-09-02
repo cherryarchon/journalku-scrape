@@ -62,8 +62,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // Save output in public/output/
-    const savedFile = saveRawResult(responseData, parseInt(batchSize, 10), customOutputName);
+    // Save output locally or in /tmp (on Vercel)
+    let savedFile: string | null = null;
+    try {
+      savedFile = saveRawResult(responseData, parseInt(batchSize, 10), customOutputName);
+    } catch (saveErr: any) {
+      console.warn("Peringatan: Gagal menyimpan file output ke disk:", saveErr?.message || saveErr);
+    }
 
     return NextResponse.json({
       success: true,
