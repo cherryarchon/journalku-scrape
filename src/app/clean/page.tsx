@@ -29,7 +29,7 @@ interface OutputFile {
   updatedAt: string;
   itemCount: number;
 }
-
+//tes
 export default function CleanStoragePage() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Scraper Journalku.online";
   const uploaderUrl = process.env.NEXT_PUBLIC_UPLOADER_URL || "http://localhost:8000";
@@ -73,7 +73,7 @@ export default function CleanStoragePage() {
     title: "",
     message: "",
     type: "warning",
-    onConfirm: () => {},
+    onConfirm: () => { },
   });
 
   const [toast, setToast] = useState<{
@@ -228,7 +228,7 @@ export default function CleanStoragePage() {
           try {
             const res = await fetch(`/api/outputs/${fileName}`, { method: "DELETE" });
             if (res.ok) successCount++;
-          } catch {}
+          } catch { }
         }
 
         setConfirmModal((prev) => ({ ...prev, isOpen: false, isProcessing: false }));
@@ -280,13 +280,12 @@ export default function CleanStoragePage() {
       {toast && (
         <div className="fixed top-5 right-5 z-50 animate-in slide-in-from-top-3 duration-200">
           <div
-            className={`px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-3 text-xs font-semibold ${
-              toast.type === "success"
+            className={`px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-3 text-xs font-semibold ${toast.type === "success"
                 ? "bg-white border-emerald-200 text-emerald-800"
                 : toast.type === "error"
-                ? "bg-white border-rose-200 text-rose-800"
-                : "bg-white border-sky-200 text-sky-800"
-            }`}
+                  ? "bg-white border-rose-200 text-rose-800"
+                  : "bg-white border-sky-200 text-sky-800"
+              }`}
           >
             {toast.type === "success" && <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />}
             {toast.type === "error" && <XCircle className="w-4 h-4 text-rose-600 shrink-0" />}
