@@ -3,6 +3,20 @@
 import React, { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
 import {
+  Shield,
+  UserCheck,
+  ChevronRight,
+  ChevronLeft,
+  KeyRound,
+  Laptop,
+  Smartphone,
+  Settings,
+  ShieldCheck,
+  X,
+  Menu,
+  EyeOff,
+  Lock,
+  LogOut,
   Globe,
   FileSpreadsheet,
   Download,
@@ -64,7 +78,7 @@ interface UrlItemStatus {
 }
 
 export default function ScraperDashboard() {
-  const [activeTab, setActiveTab] = useState<"single" | "batch" | "outputs">("single");
+  const [activeTab, setActiveTab] = useState<"single" | "batch" | "outputs" | "sync-sinta" | "settings">("single");
 
   // Server Backend Configuration & Ping States
   const defaultBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -73,6 +87,161 @@ export default function ScraperDashboard() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Scraper Journalku.online";
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "V 1.0.0";
 
+  
+  // User Authentication & Role State
+  interface CurrentUser {
+    id: string;
+    email: string;
+    display_name: string;
+    username: string;
+    role: number;
+    role_label: string;
+    isAdmin: boolean;
+    isEditor: boolean;
+  }
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  // Sync Sinta 2 Database States
+  interface SyncSintaItem {
+    id: string;
+    link: string;
+    source: string;
+    created_by: string | null;
+    user_id?: string | null;
+    created_at: string;
+  }
+  const [syncSintaItems, setSyncSintaItems] = useState<SyncSintaItem[]>([]);
+  const [isPullingSinta, setIsPullingSinta] = useState(false);
+  const [isFetchingSinta, setIsFetchingSinta] = useState(false);
+
+  // Pagination State for Sync Sinta (10 per page)
+  const [syncPage, setSyncPage] = useState(1);
+  const syncPageSize = 10;
+
+  // User Sessions State
+  interface UserSessionItem {
+    id: string;
+    user_id: string;
+    expires_at: string;
+    created_at: string;
+    is_current: boolean;
+  }
+  const [userSessions, setUserSessions] = useState<UserSessionItem[]>([]);
+  const [isFetchingSessions, setIsFetchingSessions] = useState(false);
+  const [isRevokingSession, setIsRevokingSession] = useState(false);
+
+  const fetchUserSessions = async () => {
+    setIsFetchingSessions(true);
+    try {
+      const res = await fetch('/api/user/sessions');
+      const data = await res.json();
+      if (data.sessions) setUserSessions(data.sessions);
+    } catch (err) {
+      console.error('Gagal mengambil sesi user:', err);
+    } finally {
+      setIsFetchingSessions(false);
+    }
+  };
+
+  const handleRevokeSession = async (sessionId: string) => {
+    setIsRevokingSession(true);
+    try {
+      const res = await fetch(`/api/user/sessions?id=${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setUserSessions(prev => prev.filter(s => s.id !== sessionId));
+        setToast({ show: true, type: 'success', title: 'Sesi berhasil dihapus.' });
+      } else {
+        setToast({ show: true, type: 'error', title: data.error || 'Gagal menghapus sesi' });
+      }
+    } catch (err: any) {
+      setToast({ show: true, type: 'error', title: 'Gagal menghapus sesi' });
+    } finally {
+      setIsRevokingSession(false);
+    }
+  };
+
+  const handleRevokeAllOtherSessions = async () => {
+    setIsRevokingSession(true);
+    try {
+      const res = await fetch('/api/user/sessions?all_other=true', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setUserSessions(prev => prev.filter(s => s.is_current));
+        setToast({ show: true, type: 'success', title: 'Seluruh sesi perangkat lain berhasil dihapus.' });
+      } else {
+        setToast({ show: true, type: 'error', title: data.error || 'Gagal menghapus sesi lain' });
+      }
+    } catch (err: any) {
+      setToast({ show: true, type: 'error', title: 'Gagal menghapus sesi lain' });
+    } finally {
+      setIsRevokingSession(false);
+    }
+  };
+
+
+  // Fetch current user on mount
+  useEffect(() => {
+    fetch('/api/user/me')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.user) setCurrentUser(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const fetchSyncSinta = async () => {
+    setIsFetchingSinta(true);
+    try {
+      const res = await fetch('/api/sync-sinta');
+      const data = await res.json();
+      if (data.items) setSyncSintaItems(data.items);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingSinta(false);
+    }
+  };
+
+  const handlePullSinta = async () => {
+    setIsPullingSinta(true);
+    try {
+      const res = await fetch('/api/sync-sinta', { method: 'POST' });
+      const data = await res.json();
+      if (data.items) {
+        setSyncSintaItems(data.items);
+        setToast({ show: true, type: 'success', title: `Sinkronisasi selesai! Total ${data.items ? data.items.length : 0} link SINTA terdaftar di database.` });
+      }
+    } catch (err: any) {
+      setToast({ show: true, type: 'error', title: err.message || 'Gagal menarik dari Database Utama' });
+    } finally {
+      setIsPullingSinta(false);
+    }
+  };
+
+  const handleDeleteSyncSinta = async (id: string) => {
+    try {
+      const res = await fetch(`/api/sync-sinta?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setSyncSintaItems((prev) => prev.filter((i) => i.id !== id));
+        setToast({ show: true, type: 'success', title: 'Link SINTA dan riwayat berhasil dihapus dari Database.' });
+      } else {
+        setToast({ show: true, type: 'error', title: data.error || 'Gagal menghapus' });
+      }
+    } catch (err: any) {
+      setToast({ show: true, type: 'error', title: 'Gagal menghapus link sinta' });
+    }
+  };
+
+  const handleScrapeFromSintaLink = (sintaUrl: string) => {
+    setFormUrls([sintaUrl]);
+    setActiveTab("single");
+    setToast({ show: true, type: 'info', title: 'URL SINTA dimasukkan ke Form Input Scraping.' });
+  };
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showBackendUrl, setShowBackendUrl] = useState(false);
   const [backendUrl, setBackendUrl] = useState(defaultBackendUrl);
   const [serverStatus, setServerStatus] = useState<ServerStatus>({
     isOnline: false,
@@ -252,12 +421,23 @@ export default function ScraperDashboard() {
     formLogsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [formLogs]);
 
-  // Load outputs on tab change or mount
+  // Load outputs and sync sinta on tab change or mount
   useEffect(() => {
     if (activeTab === "outputs") {
       fetchOutputs();
     }
+    if (activeTab === "sync-sinta") {
+      fetchSyncSinta();
+    }
+    if (activeTab === "settings") {
+      fetchUserSessions();
+    }
   }, [activeTab]);
+
+  // Load initial sync sinta list so counter badge is accurate
+  useEffect(() => {
+    fetchSyncSinta();
+  }, []);
 
   // Ping Backend Server Function
   const handlePingServer = async () => {
@@ -858,7 +1038,7 @@ export default function ScraperDashboard() {
   const filledUrlCount = formUrls.filter((u) => u.trim().length > 0).length;
 
   return (
-    <div className="min-h-screen bg-[#f1f6fa] text-slate-800 flex flex-col selection:bg-sky-500 selection:text-white">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col md:flex-row selection:bg-sky-500 selection:text-white">
       {/* Floating Toast Notification */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 animate-in slide-in-from-top-3 duration-200">
@@ -879,198 +1059,372 @@ export default function ScraperDashboard() {
         </div>
       )}
 
-      {/* Top Header & Brand Bar */}
-      <header className="bg-white border-b border-[#e1eaf2] shadow-xs sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="Logo Journalku"
-              className="w-10 h-10 object-contain drop-shadow-xs"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-extrabold tracking-tight text-slate-900">
-                  {appName}
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 font-mono">
-                  {appVersion}
-                </span>
+      
+      {/* Mobile Drawer Overlay */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 md:hidden animate-in fade-in duration-200"
+        />
+      )}
+
+      {/* LEFT SIDEBAR (Desktop fixed + Mobile slide-over) */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-[#e1eaf2] flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex flex-col flex-1 overflow-y-auto p-5">
+          {/* Brand & Logo */}
+          <div className="flex items-center justify-between pb-5 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo.png"
+                alt="Logo Journalku"
+                className="w-9 h-9 object-contain drop-shadow-xs"
+              />
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-base font-extrabold tracking-tight text-slate-900">
+                    {appName}
+                  </h1>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-sky-50 text-sky-700 border border-sky-200 font-mono">
+                    {appVersion}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">Web Scraper Engine</p>
               </div>
-              <p className="text-xs text-slate-500">
-                Ekstraksi Metadata Jurnal SINTA, Garuda, dan OJS secara Otomatis
-              </p>
             </div>
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 md:hidden"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Quick Navigation Links */}
-          <div className="flex items-center gap-2.5 flex-wrap">
+          {/* User Profile Card */}
+          {currentUser && (
+            <div className="my-4 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-500 text-white flex items-center justify-center text-xs font-bold shadow-xs shrink-0">
+                  {currentUser.display_name ? currentUser.display_name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-xs font-bold text-slate-800 truncate leading-tight">
+                    {currentUser.display_name}
+                  </p>
+                  <p className="text-[10px] text-slate-400 truncate font-mono">{currentUser.email}</p>
+                  <div className="mt-1">
+                    {currentUser.isAdmin ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-rose-100 text-rose-700 border border-rose-200">
+                        🛡️ ADMINISTRATOR
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-sky-100 text-sky-700 border border-sky-200">
+                        ✏️ EDITOR
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Menu */}
+          <div className="space-y-1.5 mt-2">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 pb-1">
+              Menu Scraping
+            </p>
+
+            <button
+              onClick={() => {
+                setActiveTab("single");
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "single"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Search className="w-4 h-4" />
+                <span>Form Input URL</span>
+              </div>
+              {formUrls.length > 1 && (
+                <span className={`px-1.5 py-0.2 text-[10px] rounded font-mono ${
+                  activeTab === "single" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {formUrls.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("batch");
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "batch"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-4 h-4" />
+                <span>Batch Scraping (Excel)</span>
+              </div>
+              {batchUrls.length > 0 && (
+                <span className={`px-1.5 py-0.2 text-[10px] rounded font-mono ${
+                  activeTab === "batch" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {batchUrls.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("sync-sinta");
+                fetchSyncSinta();
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "sync-sinta"
+                  ? "bg-indigo-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <RefreshCw className={`w-4 h-4 ${isFetchingSinta ? "animate-spin" : ""}`} />
+                <span>Sync SINTA (2 DB)</span>
+              </div>
+              {syncSintaItems.length > 0 && (
+                <span className={`px-1.5 py-0.2 text-[10px] rounded font-mono ${
+                  activeTab === "sync-sinta" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {syncSintaItems.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("outputs");
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "outputs"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FolderArchive className="w-4 h-4" />
+                <span>Output JSON & ZIP</span>
+              </div>
+              {outputFiles.length > 0 && (
+                <span className={`px-1.5 py-0.2 text-[10px] rounded font-mono font-bold ${
+                  activeTab === "outputs" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {outputFiles.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("settings");
+                fetchUserSessions();
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "settings"
+                  ? "bg-sky-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Settings className="w-4 h-4" />
+                <span>Pengaturan &amp; Sesi</span>
+              </div>
+              {userSessions.length > 0 && (
+                <span className={`px-1.5 py-0.2 text-[10px] rounded font-mono ${
+                  activeTab === "settings" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {userSessions.length}
+                </span>
+              )}
+            </button>
+
+            <div className="pt-4 pb-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 pb-1">
+                Akses Eksternal
+              </p>
+            </div>
+
             <a
               href="/clean"
-              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-all border border-slate-200"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-rose-700 hover:bg-rose-50 transition-all"
             >
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              Bersihkan Storage (/clean)
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>Bersihkan Storage</span>
             </a>
 
             <a
               href={uploaderUrl}
               target="_blank"
               rel="noreferrer"
-              className="px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              Buka Portal Uploader
+              <ExternalLink className="w-4 h-4 text-slate-400" />
+              <span>Portal Uploader</span>
             </a>
 
             <a
               href={mainSiteUrl}
               target="_blank"
               rel="noreferrer"
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-xl flex items-center gap-1.5 transition-all border border-slate-200"
+              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all"
             >
-              <Globe className="w-3.5 h-3.5" />
-              Journalku.online
+              <Globe className="w-4 h-4 text-slate-400" />
+              <span>Journalku.online</span>
             </a>
           </div>
         </div>
-      </header>
 
-      {/* Main Body Content */}
-      <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 space-y-6">
-        {/* SERVER BACKEND PING & STATUS BAR */}
-        <div className="bg-white rounded-3xl p-6 border border-[#e1eaf2] shadow-xs">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-11 h-11 rounded-2xl flex items-center justify-center border ${
-                  serverStatus.isOnline
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-600"
-                    : "bg-amber-50 border-amber-200 text-amber-600"
-                }`}
-              >
-                <Server className="w-5 h-5" />
-              </div>
+        {/* Sidebar Footer Logout */}
+        <div className="p-5 border-t border-slate-100 bg-white">
+          <form action="/api/auth/logout" method="POST">
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 transition-all"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Keluar (Logout)</span>
+            </button>
+          </form>
+        </div>
+      </aside>
 
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Flask Backend Server Connection
-                  </h2>
-
-                  {serverStatus.isOnline ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      ONLINE (Aktif)
-                    </span>
-                  ) : (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" />
-                      OFFLINE / IDLE
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {serverStatus.message}
-                  {serverStatus.lastChecked && (
-                    <span className="text-slate-400 ml-2 font-mono">
-                      (Diperiksa: {serverStatus.lastChecked})
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <div className="w-full sm:w-60">
-                <input
-                  type="url"
-                  placeholder="http://localhost:5000"
-                  value={backendUrl}
-                  onChange={(e) => setBackendUrl(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-xs font-mono text-slate-900 transition-all outline-none"
-                />
-              </div>
-
-              <button
-                onClick={handlePingServer}
-                disabled={isPinging}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition-all shadow-xs whitespace-nowrap"
-              >
-                <Activity className={`w-3.5 h-3.5 ${isPinging ? "animate-spin" : ""}`} />
-                {isPinging ? "Pinging..." : "Ping Server Backend"}
-              </button>
+      {/* RIGHT MAIN CONTENT AREA */}
+      <main className="flex-1 flex flex-col min-w-0 min-h-screen overflow-y-auto">
+        {/* Mobile Header Bar */}
+        <div className="md:hidden bg-white border-b border-[#e1eaf2] p-4 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="Logo" className="w-7 h-7 object-contain" />
+              <span className="font-bold text-sm text-slate-900">{appName}</span>
             </div>
           </div>
-
-          {!serverStatus.isOnline && (
-            <div className="mt-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
-              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                <strong>Perhatian:</strong> Fitur scraping memerlukan server backend. Klik tombol{" "}
-                <strong>Ping Server Backend</strong> dan pastikan status <strong>ONLINE</strong> sebelum memulai scraping.
-              </span>
-            </div>
+          {currentUser && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              {currentUser.role_label}
+            </span>
           )}
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex gap-2 p-1.5 bg-white border border-[#e1eaf2] rounded-2xl max-w-fit flex-wrap shadow-xs">
-          <button
-            onClick={() => setActiveTab("single")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "single"
-                ? "bg-sky-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-            }`}
-          >
-            <Search className="w-3.5 h-3.5" />
-            Form Input URL (1 - 10 URL)
-            {formUrls.length > 1 && (
-              <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded bg-white/20 text-white font-mono">
-                {formUrls.length}
-              </span>
-            )}
-          </button>
+        <div className="flex-1 max-w-6xl w-full mx-auto p-4 md:p-8 space-y-6">
+          {/* SERVER BACKEND PING & STATUS BAR (WITH SECRET MASKED URL) */}
+          <div className="bg-white rounded-3xl p-6 border border-[#e1eaf2] shadow-xs">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center border ${
+                    serverStatus.isOnline
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                      : "bg-amber-50 border-amber-200 text-amber-600"
+                  }`}
+                >
+                  <Server className="w-5 h-5" />
+                </div>
 
-          <button
-            onClick={() => setActiveTab("batch")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "batch"
-                ? "bg-sky-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-            }`}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            Batch Scraping (Excel)
-            {batchUrls.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded bg-white/20 text-white font-mono">
-                {batchUrls.length}
-              </span>
-            )}
-          </button>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-bold text-slate-900">
+                      Flask Backend Server Connection
+                    </h2>
 
-          <button
-            onClick={() => setActiveTab("outputs")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeTab === "outputs"
-                ? "bg-sky-600 text-white shadow-xs"
-                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
-            }`}
-          >
-            <FolderArchive className="w-3.5 h-3.5" />
-            Output JSON & ZIP
-            {outputFiles.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded bg-slate-100 text-slate-700 font-mono font-bold">
-                {outputFiles.length}
-              </span>
-            )}
-          </button>
-        </div>
+                    {serverStatus.isOnline ? (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                        ONLINE (Aktif)
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                        OFFLINE / IDLE
+                      </span>
+                    )}
+                  </div>
 
-        {/* TAB 1: FORM INPUT URL (1 TO 10 URLs DYNAMIC) */}
-        {activeTab === "single" && (
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {serverStatus.message}
+                    {serverStatus.lastChecked && (
+                      <span className="text-slate-400 ml-2 font-mono">
+                        (Diperiksa: {serverStatus.lastChecked})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* Masked Secret Backend URL Input & Ping Button */}
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <div className="relative w-full sm:w-64">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-3.5 h-3.5" />
+                  </div>
+                  <input
+                    type={showBackendUrl ? "text" : "password"}
+                    placeholder="URL Backend Terproteksi"
+                    value={backendUrl}
+                    onChange={(e) => setBackendUrl(e.target.value)}
+                    className="w-full pl-8 pr-9 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-100 text-xs font-mono text-slate-900 transition-all outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowBackendUrl(!showBackendUrl)}
+                    title={showBackendUrl ? "Sembunyikan URL" : "Tampilkan URL"}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showBackendUrl ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+
+                <button
+                  onClick={handlePingServer}
+                  disabled={isPinging}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl flex items-center gap-2 transition-all shadow-xs whitespace-nowrap"
+                >
+                  <Activity className={`w-3.5 h-3.5 ${isPinging ? "animate-spin" : ""}`} />
+                  {isPinging ? "Pinging..." : "Ping Server Backend"}
+                </button>
+              </div>
+            </div>
+
+            {!serverStatus.isOnline && (
+              <div className="mt-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
+                <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>
+                  <strong>Perhatian:</strong> Fitur scraping memerlukan server backend. Klik tombol{" "}
+                  <strong>Ping Server Backend</strong> dan pastikan status <strong>ONLINE</strong> sebelum memulai scraping.
+                </span>
+              </div>
+            )}
+          </div>
+
+{activeTab === "single" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Form Column */}
             <div className="lg:col-span-6 space-y-6">
@@ -1763,6 +2117,392 @@ export default function ScraperDashboard() {
         )}
 
         {/* TAB 3: OUTPUT FILES & ZIP DOWNLOAD */}
+        {activeTab === "sync-sinta" && (() => {
+          const totalSyncPages = Math.ceil(syncSintaItems.length / syncPageSize) || 1;
+          const currentSyncPage = Math.min(syncPage, totalSyncPages);
+          const paginatedSyncItems = syncSintaItems.slice((currentSyncPage - 1) * syncPageSize, currentSyncPage * syncPageSize);
+
+          return (
+            <div className="bg-white rounded-3xl p-6 border border-[#e1eaf2] shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200 uppercase tracking-wider">
+                      Integrasi 2 Database
+                    </span>
+                    <h2 className="text-base font-bold text-slate-900">
+                      Daftar Link SINTA Terdaftar
+                    </h2>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Link yang ada di tabel ini akan <strong>otomatis di-skip</strong> saat Anda memulai proses scraping.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={fetchSyncSinta}
+                    disabled={isFetchingSinta}
+                    className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSinta ? "animate-spin" : ""}`} />
+                    Segarkan
+                  </button>
+
+                  {/* KHUSUS ROLE ADMINISTRATOR: Tombol Tarik Link SINTA dari DB Utama */}
+                  {currentUser?.isAdmin && (
+                    <button
+                      onClick={handlePullSinta}
+                      disabled={isPullingSinta}
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs shadow-indigo-600/30 hover:shadow-indigo-600/50 transition-all duration-150 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isPullingSinta ? "animate-spin" : ""}`} />
+                      {isPullingSinta ? "Menarik dari Database 1..." : "Tarik Link SINTA dari Database Utama"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Content Table / Empty State */}
+              {syncSintaItems.length === 0 ? (
+                <div className="p-12 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+                    <RefreshCw className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800">Belum Ada Link SINTA di Database</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                    {currentUser?.isAdmin
+                      ? 'Klik tombol "Tarik Link SINTA dari Database Utama" di atas untuk mengimpor link dari Database 1, atau mulai scraping manual.'
+                      : 'Belum ada link yang terdaftar di database sync SINTA.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                          <th className="py-3 px-4 font-bold w-12 text-center">No</th>
+                          <th className="py-3 px-4 font-bold">Link SINTA (Registri Unik)</th>
+                          <th className="py-3 px-4 font-bold w-36 text-center">Asal Data</th>
+                          <th className="py-3 px-4 font-bold w-40 text-center">Dibuat Oleh</th>
+                          <th className="py-3 px-4 font-bold w-36 text-center">Tanggal</th>
+                          {/* KHUSUS ADMINISTRATOR: Kolom Aksi */}
+                          {currentUser?.isAdmin && (
+                            <th className="py-3 px-4 font-bold w-36 text-center">Aksi</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {paginatedSyncItems.map((item, idx) => (
+                          <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3.5 px-4 text-center text-slate-400 font-mono text-[11px]">
+                              {(currentSyncPage - 1) * syncPageSize + idx + 1}
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <a
+                                href={item.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 font-mono text-[11px] truncate max-w-lg"
+                              >
+                                <span className="truncate">{item.link}</span>
+                                <ExternalLink className="w-3 h-3 shrink-0 text-slate-400" />
+                              </a>
+                            </td>
+                            <td className="py-3.5 px-4 text-center">
+                              {item.source === 'database' ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <Globe className="w-3 h-3 text-emerald-600" />
+                                  Database 1
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200">
+                                  <Sparkles className="w-3 h-3 text-sky-600" />
+                                  Scrape Manual
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center text-slate-600 font-mono text-[11px]">
+                              {!item.created_by && !item.user_id ? (
+                                <span className="text-slate-400 italic">Sistem (Sync)</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-sans font-semibold text-[10px]">
+                                  User Akun
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-4 text-center text-slate-500 font-mono text-[11px]">
+                              {item.created_at ? new Date(item.created_at).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
+                            </td>
+                            {/* KHUSUS ADMINISTRATOR: Tombol Scrape & Hapus */}
+                            {currentUser?.isAdmin && (
+                              <td className="py-3.5 px-4 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button
+                                    onClick={() => handleScrapeFromSintaLink(item.link)}
+                                    className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                    title="Scrape ulang link ini"
+                                  >
+                                    <Play className="w-3 h-3" />
+                                    Scrape
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteSyncSinta(item.id)}
+                                    className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                                    title="Hapus link dari database"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Hapus
+                                  </button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* PAGINATION CONTROLS (TIAP 10 ITEM) */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 pt-2 text-xs text-slate-500">
+                    <div>
+                      Menampilkan{' '}
+                      <span className="font-bold text-slate-800 font-mono">
+                        {(currentSyncPage - 1) * syncPageSize + 1}
+                      </span>{' '}
+                      -{' '}
+                      <span className="font-bold text-slate-800 font-mono">
+                        {Math.min(currentSyncPage * syncPageSize, syncSintaItems.length)}
+                      </span>{' '}
+                      dari{' '}
+                      <span className="font-bold text-slate-800 font-mono">
+                        {syncSintaItems.length}
+                      </span>{' '}
+                      link SINTA
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setSyncPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentSyncPage <= 1}
+                        className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        title="Halaman Sebelumnya"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+
+                      <div className="px-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl font-mono font-bold text-slate-700 text-xs">
+                        {currentSyncPage} / {totalSyncPages}
+                      </div>
+
+                      <button
+                        onClick={() => setSyncPage(prev => Math.min(totalSyncPages, prev + 1))}
+                        disabled={currentSyncPage >= totalSyncPages}
+                        className="p-2 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        title="Halaman Berikutnya"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* SETTINGS / PENGATURAN & KELOLA SESI */}
+        {activeTab === "settings" && (
+          <div className="space-y-6">
+            {/* Profil Card */}
+            <div className="bg-white rounded-3xl p-6 border border-[#e1eaf2] shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Pengaturan Akun &amp; Sesi Login
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Kelola identitas akun dan pantau seluruh sesi aktif yang sedang masuk.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 font-mono">
+                    ID: {currentUser?.id?.slice(0, 8)}...
+                  </span>
+                </div>
+              </div>
+
+              {currentUser && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Nama Pengguna</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5">{currentUser.display_name}</p>
+                    <p className="text-xs text-slate-500 font-mono mt-0.5">@{currentUser.username}</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Alamat Email</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">{currentUser.email}</p>
+                    <p className="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Terverifikasi SSO
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <p className="text-[10px] uppercase font-bold text-slate-400">Peran Akun</p>
+                    <div className="mt-1">
+                      {currentUser.isAdmin ? (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-700 border border-rose-200">
+                          🛡️ ADMINISTRATOR (Akses Penuh)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-sky-100 text-sky-700 border border-sky-200">
+                          ✏️ EDITOR (Data Pribadi)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sesi Manajemen Card */}
+            <div className="bg-white rounded-3xl p-6 border border-[#e1eaf2] shadow-xs space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-4 h-4 text-indigo-600" />
+                    <h3 className="text-base font-bold text-slate-900">
+                      Sesi Login Aktif ({userSessions.length})
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Berikut adalah seluruh sesi yang sedang terhubung ke akun Anda di database Web Scraper.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchUserSessions}
+                    disabled={isFetchingSessions}
+                    className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isFetchingSessions ? "animate-spin" : ""}`} />
+                    Segarkan Sesi
+                  </button>
+
+                  {userSessions.filter(s => !s.is_current).length > 0 && (
+                    <button
+                      onClick={handleRevokeAllOtherSessions}
+                      disabled={isRevokingSession}
+                      className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Hapus Sesi Perangkat Lain
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {userSessions.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-400">
+                  Tidak ada sesi aktif yang ditemukan.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
+                  {userSessions.map((session, idx) => (
+                    <div
+                      key={session.id}
+                      className={`p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors ${
+                        session.is_current ? "bg-emerald-50/40" : "hover:bg-slate-50/70"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5">
+                        <div
+                          className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border ${
+                            session.is_current
+                              ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+                              : "bg-slate-100 border-slate-200 text-slate-500"
+                          }`}
+                        >
+                          <Laptop className="w-5 h-5" />
+                        </div>
+
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-xs text-slate-900 font-mono">
+                              Sesi #{idx + 1} ({session.id.slice(0, 8)}...)
+                            </span>
+                            {session.is_current ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
+                                Sesi Ini (Perangkat Anda)
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                                Sesi Perangkat Lain
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-4 text-[11px] text-slate-500 mt-1 flex-wrap">
+                            <span>
+                              Masuk Terakhir:{' '}
+                              <strong className="text-slate-700">
+                                {new Date(session.created_at).toLocaleString('id-ID', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </strong>
+                            </span>
+                            <span>&bull;</span>
+                            <span>
+                              Berlaku Sampai:{' '}
+                              <strong className="text-slate-700">
+                                {new Date(session.expires_at).toLocaleDateString('id-ID', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        {session.is_current ? (
+                          <form action="/api/auth/logout" method="POST">
+                            <button
+                              type="submit"
+                              className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition-all"
+                            >
+                              Keluar (Logout)
+                            </button>
+                          </form>
+                        ) : (
+                          <button
+                            onClick={() => handleRevokeSession(session.id)}
+                            disabled={isRevokingSession}
+                            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-all flex items-center gap-1.5"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus Sesi</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === "outputs" && (
           <div className="space-y-6">
             <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#e1eaf2] shadow-xs">
@@ -1932,6 +2672,7 @@ export default function ScraperDashboard() {
           <p className="font-medium text-slate-500">© {new Date().getFullYear()} Journalku.online - Seluruh Hak Cipta Dilindungi</p>
         </div>
       </footer>
+      </main>
 
       {/* Modern Custom JSON Preview Modal */}
       {viewingJson && (
