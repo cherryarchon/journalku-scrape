@@ -193,11 +193,15 @@ export default function ScraperDashboard() {
   const fetchSyncSinta = async () => {
     setIsFetchingSinta(true);
     try {
-      const res = await fetch('/api/sync-sinta');
+      const res = await fetch('/api/sync-sinta', { credentials: 'include' });
       const data = await res.json();
-      if (data.items) setSyncSintaItems(data.items);
+      if (res.ok && data.items) {
+        setSyncSintaItems(data.items);
+      } else if (res.status === 401) {
+        console.warn('[Sync Sinta] Sesi belum aktif atau cookie session tidak ditemukan.');
+      }
     } catch (err) {
-      console.error(err);
+      console.error('[Sync Sinta] Gagal memuat daftar sync sinta:', err);
     } finally {
       setIsFetchingSinta(false);
     }
@@ -206,11 +210,24 @@ export default function ScraperDashboard() {
   const handlePullSinta = async () => {
     setIsPullingSinta(true);
     try {
-      const res = await fetch('/api/sync-sinta', { method: 'POST' });
+      const res = await fetch('/api/sync-sinta', {
+        method: 'POST',
+        credentials: 'include',
+      });
       const data = await res.json();
-      if (data.items) {
+      if (res.ok && data.items) {
         setSyncSintaItems(data.items);
-        setToast({ show: true, type: 'success', title: `Sinkronisasi selesai! Total ${data.items ? data.items.length : 0} link SINTA terdaftar di database.` });
+        setToast({
+          show: true,
+          type: 'success',
+          title: data.message || `Sinkronisasi selesai! Total ${data.items ? data.items.length : 0} link SINTA terdaftar di database.`,
+        });
+      } else {
+        setToast({
+          show: true,
+          type: 'error',
+          title: data.message || data.error || 'Gagal menarik dari Database Utama',
+        });
       }
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: err.message || 'Gagal menarik dari Database Utama' });
@@ -221,13 +238,16 @@ export default function ScraperDashboard() {
 
   const handleDeleteSyncSinta = async (id: string) => {
     try {
-      const res = await fetch(`/api/sync-sinta?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await fetch(`/api/sync-sinta?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
       const data = await res.json();
-      if (data.success) {
+      if (res.ok && data.success) {
         setSyncSintaItems((prev) => prev.filter((i) => i.id !== id));
-        setToast({ show: true, type: 'success', title: 'Link SINTA dan riwayat berhasil dihapus dari Database.' });
+        setToast({ show: true, type: 'success', title: data.message || 'Link SINTA dan riwayat berhasil dihapus dari Database.' });
       } else {
-        setToast({ show: true, type: 'error', title: data.error || 'Gagal menghapus' });
+        setToast({ show: true, type: 'error', title: data.message || data.error || 'Gagal menghapus' });
       }
     } catch (err: any) {
       setToast({ show: true, type: 'error', title: 'Gagal menghapus link sinta' });

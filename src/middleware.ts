@@ -24,10 +24,20 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Periksa cookie session
-  const sessionToken = req.cookies.get('journalku_session')?.value;
+  // Lewati endpoint yang menangani autentikasinya sendiri secara komprehensif
+  if (pathname.startsWith('/api/sync-sinta')) {
+    return NextResponse.next();
+  }
 
-  if (!sessionToken) {
+  // Periksa autentikasi: Cookie session, Authorization header, atau API secret
+  const sessionToken = req.cookies.get('journalku_session')?.value;
+  const authHeader = req.headers.get('authorization');
+  const customSessionToken = req.headers.get('x-session-token');
+  const apiSecret = req.headers.get('x-api-secret');
+
+  const hasAuth = !!sessionToken || !!authHeader || !!customSessionToken || !!apiSecret;
+
+  if (!hasAuth) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json({ error: 'unauthorized', message: 'Silakan login terlebih dahulu.' }, { status: 401 });
     }

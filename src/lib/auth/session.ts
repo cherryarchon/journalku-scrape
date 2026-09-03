@@ -24,22 +24,26 @@ export function hashToken(rawToken: string): string {
 }
 
 /**
- * Map role string dari Web B ("admin", "editor", "user") ke integer Database B
+ * Map role string dari Web B ("admin", "editor", "user", atau angka string "2", "3", "1") ke integer Database B
  */
 export function mapRoleStringToInt(roleStr: string | number): number {
   if (typeof roleStr === 'number') return roleStr;
-  const lower = String(roleStr || '').toLowerCase();
-  if (lower === 'admin') return 2;
-  if (lower === 'editor') return 3;
+  const lower = String(roleStr || '').trim().toLowerCase();
+  if (lower === '2' || lower === 'admin' || lower === 'administrator') return 2;
+  if (lower === '3' || lower === 'editor') return 3;
+  if (lower === '1' || lower === 'user') return 1;
+  const parsed = parseInt(lower, 10);
+  if (!isNaN(parsed) && [1, 2, 3].includes(parsed)) return parsed;
   return 1; // default user
 }
 
 /**
  * Map integer role Database B ke string
  */
-export function mapRoleIntToString(roleInt: number): string {
-  if (roleInt === 2) return 'admin';
-  if (roleInt === 3) return 'editor';
+export function mapRoleIntToString(roleInt: number | string): string {
+  const num = typeof roleInt === 'number' ? roleInt : parseInt(String(roleInt), 10);
+  if (num === 2) return 'admin';
+  if (num === 3) return 'editor';
   return 'user';
 }
 
