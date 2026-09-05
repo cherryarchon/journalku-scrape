@@ -29,7 +29,7 @@ interface OutputFile {
   updatedAt: string;
   itemCount: number;
 }
-//tes
+
 export default function CleanStoragePage() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || "Scraper Journalku.online";
   const uploaderUrl = process.env.NEXT_PUBLIC_UPLOADER_URL || "http://localhost:8000";

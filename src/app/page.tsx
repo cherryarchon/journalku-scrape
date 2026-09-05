@@ -49,6 +49,7 @@ import {
   AlertModal,
   JsonPreviewModal,
 } from "@/components/ModalDialog";
+import JsonToExcelConverter from "@/components/JsonToExcelConverter";
 
 interface OutputFile {
   name: string;
@@ -68,7 +69,7 @@ interface ServerStatus {
 }
 
 interface UrlItemStatus {
-  status: "idle" | "loading" | "success" | "error";
+  status: "idle" | "loading" | "success" | "skipped" | "error";
   message?: string;
   name?: string;
   savedFile?: string;
@@ -77,8 +78,31 @@ interface UrlItemStatus {
   ojsPages?: number;
 }
 
+function extractJournalMetadata(dataItem: any) {
+  if (!dataItem) return { name: "Jurnal", sintaLevel: null, publisher: null, ojsPages: 0 };
+
+  const keys = Object.keys(dataItem);
+  if (keys.length === 1 && dataItem[keys[0]] && (dataItem[keys[0]].sinta || dataItem[keys[0]].garuda || dataItem[keys[0]].ojs)) {
+    const journalName = keys[0];
+    const item = dataItem[journalName];
+    return {
+      name: journalName,
+      sintaLevel: item.sinta?.sinta_level ?? null,
+      publisher: item.sinta?.publisher ?? null,
+      ojsPages: item.ojs?.ojs_pages?.length || 0,
+    };
+  }
+
+  return {
+    name: dataItem.sinta_data?.name || dataItem.sinta?.name || dataItem.name || "Jurnal",
+    sintaLevel: dataItem.sinta_data?.sinta_level ?? dataItem.sinta?.sinta_level ?? null,
+    publisher: dataItem.sinta_data?.publisher ?? dataItem.sinta?.publisher ?? null,
+    ojsPages: dataItem.ojs_pages?.length || dataItem.ojs?.ojs_pages?.length || 0,
+  };
+}
+
 export default function ScraperDashboard() {
-  const [activeTab, setActiveTab] = useState<"single" | "batch" | "outputs" | "sync-sinta" | "settings">("single");
+  const [activeTab, setActiveTab] = useState<"single" | "batch" | "json-to-excel" | "outputs" | "sync-sinta" | "settings">("single");
 
   // Server Backend Configuration & Ping States
   const defaultBackendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
@@ -111,6 +135,12 @@ export default function ScraperDashboard() {
     created_at: string;
   }
   const [syncSintaItems, setSyncSintaItems] = useState<SyncSintaItem[]>([]);
+  const [syncStats, setSyncStats] = useState<{
+    totalJournals: number;
+    withSintaUrl: number;
+    withoutSintaUrl: number;
+    syncedInDb2: number;
+  } | null>(null);
   const [isPullingSinta, setIsPullingSinta] = useState(false);
   const [isFetchingSinta, setIsFetchingSinta] = useState(false);
 
@@ -197,6 +227,9 @@ export default function ScraperDashboard() {
       const data = await res.json();
       if (res.ok && data.items) {
         setSyncSintaItems(data.items);
+        if (data.stats) {
+          setSyncStats(data.stats);
+        }
       } else if (res.status === 401) {
         console.warn('[Sync Sinta] Sesi belum aktif atau cookie session tidak ditemukan.');
       }
@@ -217,6 +250,9 @@ export default function ScraperDashboard() {
       const data = await res.json();
       if (res.ok && data.items) {
         setSyncSintaItems(data.items);
+        if (data.stats) {
+          setSyncStats(data.stats);
+        }
         setToast({
           show: true,
           type: 'success',
@@ -641,18 +677,33 @@ export default function ScraperDashboard() {
           throw new Error(data.error || "Gagal scraping jurnal.");
         }
 
+        if (data.skipped) {
+          setUrlStatuses({
+            [targetItem.originalIdx]: {
+              status: "skipped" as any,
+              message: data.message || "Link SINTA sudah ada di database sync_sinta (dilewati).",
+            },
+          });
+          showToast(data.message || "Link SINTA sudah ada di database (dilewati).", "info");
+          setIsFormScraping(false);
+          setCurrentProcessingItemUrl("");
+          fetchSyncSinta();
+          return;
+        }
+
+        const meta = extractJournalMetadata(data.data);
         setSingleResult(data);
         setUrlStatuses({
           [targetItem.originalIdx]: {
             status: "success",
-            name: data.data?.sinta_data?.name || "Jurnal",
+            name: meta.name,
             savedFile: data.savedFile ? data.savedFile.split(/[\\/]/).pop() : undefined,
-            sintaLevel: data.data?.sinta_data?.sinta_level,
-            publisher: data.data?.sinta_data?.publisher,
-            ojsPages: data.data?.ojs_pages?.length || 0,
+            sintaLevel: meta.sintaLevel !== null ? String(meta.sintaLevel) : undefined,
+            publisher: meta.publisher || undefined,
+            ojsPages: meta.ojsPages,
           },
         });
-        showToast(`Berhasil mengekstraksi jurnal: ${data.data?.sinta_data?.name || "Jurnal"}`, "success");
+        showToast(`Berhasil mengekstraksi jurnal: ${meta.name}`, "success");
         fetchOutputs();
       } catch (err: any) {
         const msg = err.message || "Terjadi kesalahan sistem.";
@@ -717,8 +768,24 @@ export default function ScraperDashboard() {
 
         const data = await res.json();
         if (res.ok && data.success) {
+          if (data.skipped) {
+            setUrlStatuses((prev) => ({
+              ...prev,
+              [item.originalIdx]: {
+                status: "skipped" as any,
+                message: data.message || "Sudah ada di database sync_sinta (dilewati)",
+              },
+            }));
+            setFormLogs((prev) => [
+              ...prev,
+              `  ⏩ Dilewati (Sudah ada di database): ${item.url}`,
+            ]);
+            continue;
+          }
+
           successCount++;
-          const journalName = data.data?.sinta_data?.name || "Jurnal";
+          const meta = extractJournalMetadata(data.data);
+          const journalName = meta.name;
           const savedFileName = data.savedFile ? data.savedFile.split(/[\\/]/).pop() : "output.json";
 
           setUrlStatuses((prev) => ({
@@ -727,9 +794,9 @@ export default function ScraperDashboard() {
               status: "success",
               name: journalName,
               savedFile: savedFileName,
-              sintaLevel: data.data?.sinta_data?.sinta_level,
-              publisher: data.data?.sinta_data?.publisher,
-              ojsPages: data.data?.ojs_pages?.length || 0,
+              sintaLevel: meta.sintaLevel !== null ? String(meta.sintaLevel) : undefined,
+              publisher: meta.publisher || undefined,
+              ojsPages: meta.ojsPages,
             },
           }));
 
@@ -917,10 +984,18 @@ export default function ScraperDashboard() {
 
         const data = await res.json();
         if (res.ok && data.success) {
+          if (data.skipped) {
+            setBatchLogs((prev) => [
+              ...prev,
+              `  ⏩ Dilewati (Sudah ada di database sync_sinta): ${item.url}`,
+            ]);
+            continue;
+          }
           successCount++;
+          const meta = extractJournalMetadata(data.data);
           setBatchLogs((prev) => [
             ...prev,
-            `  ✅ Sukses [${data.data?.sinta_data?.name || "Jurnal"}] -> Tersimpan di ${data.savedFile}`,
+            `  ✅ Sukses [${meta.name}] -> Tersimpan di ${data.savedFile}`,
           ]);
         } else {
           failedCount++;
@@ -1205,6 +1280,32 @@ export default function ScraperDashboard() {
                   {batchUrls.length}
                 </span>
               )}
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("json-to-excel");
+                setSidebarOpen(false);
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTab === "json-to-excel"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>JSON ke Excel (Impor)</span>
+              </div>
+              <span
+                className={`px-1.5 py-0.2 text-[9px] rounded font-mono font-bold ${
+                  activeTab === "json-to-excel"
+                    ? "bg-white/20 text-white"
+                    : "bg-emerald-100 text-emerald-800"
+                }`}
+              >
+                XLSX
+              </span>
             </button>
 
             <button
@@ -1529,6 +1630,11 @@ export default function ScraperDashboard() {
                                     <CheckCircle2 className="w-3 h-3" /> Sukses
                                   </span>
                                 )}
+                                {itemStatus.status === "skipped" && (
+                                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 font-medium">
+                                    <CheckCircle2 className="w-3 h-3 text-amber-600" /> Dilewati (Sudah Ada)
+                                  </span>
+                                )}
                                 {itemStatus.status === "error" && (
                                   <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 font-medium">
                                     <XCircle className="w-3 h-3" /> Gagal
@@ -1571,6 +1677,11 @@ export default function ScraperDashboard() {
                                   {itemStatus.savedFile}
                                 </span>
                               )}
+                            </div>
+                          )}
+                          {itemStatus?.status === "skipped" && itemStatus.message && (
+                            <div className="text-[11px] text-amber-700 pl-1 truncate font-medium">
+                              ⏩ {itemStatus.message}
                             </div>
                           )}
                           {itemStatus?.status === "error" && itemStatus.message && (
@@ -1908,42 +2019,45 @@ export default function ScraperDashboard() {
                           </div>
                         )}
 
-                        {singleResult ? (
-                          <div className="flex-1 flex flex-col space-y-4">
-                            <div className="p-4 rounded-2xl bg-[#f8fafc] border border-[#e1eaf2] text-xs space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Nama Jurnal:</span>
-                                <span className="font-bold text-slate-900">
-                                  {singleResult.data?.sinta_data?.name || "-"}
-                                </span>
+                        {singleResult ? (() => {
+                          const meta = extractJournalMetadata(singleResult.data);
+                          return (
+                            <div className="flex-1 flex flex-col space-y-4">
+                              <div className="p-4 rounded-2xl bg-[#f8fafc] border border-[#e1eaf2] text-xs space-y-2">
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Nama Jurnal:</span>
+                                  <span className="font-bold text-slate-900">
+                                    {meta.name || "-"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Akreditasi:</span>
+                                  <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                    {meta.sintaLevel
+                                      ? `SINTA ${meta.sintaLevel}`
+                                      : "-"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">Penerbit:</span>
+                                  <span className="text-slate-700">
+                                    {meta.publisher || "-"}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-slate-500">OJS Pages Crawled:</span>
+                                  <span className="text-sky-700 font-mono font-bold">
+                                    {meta.ojsPages} Halaman
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Akreditasi:</span>
-                                <span className="font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                                  {singleResult.data?.sinta_data?.sinta_level
-                                    ? `SINTA ${singleResult.data.sinta_data.sinta_level}`
-                                    : "-"}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">Penerbit:</span>
-                                <span className="text-slate-700">
-                                  {singleResult.data?.sinta_data?.publisher || "-"}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-slate-500">OJS Pages Crawled:</span>
-                                <span className="text-sky-700 font-mono font-bold">
-                                  {singleResult.data?.ojs_pages?.length || 0} Halaman
-                                </span>
-                              </div>
-                            </div>
 
-                            <div className="relative flex-1 min-h-[260px] bg-slate-900 rounded-2xl p-4 border border-slate-800 overflow-auto font-mono text-xs text-slate-200">
-                              <pre>{JSON.stringify(singleResult.data, null, 2)}</pre>
+                              <div className="relative flex-1 min-h-[260px] bg-slate-900 rounded-2xl p-4 border border-slate-800 overflow-auto font-mono text-xs text-slate-200">
+                                <pre>{JSON.stringify(singleResult.data, null, 2)}</pre>
+                              </div>
                             </div>
-                          </div>
-                        ) : (
+                          );
+                        })() : (
                           !singleError && (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400 border border-dashed border-slate-200 rounded-2xl">
                               <Search className="w-12 h-12 stroke-1 mb-3 opacity-40 text-slate-400" />
@@ -2136,6 +2250,9 @@ export default function ScraperDashboard() {
           </div>
         )}
 
+        {/* TAB: KONVERSI JSON KE EXCEL */}
+        {activeTab === "json-to-excel" && <JsonToExcelConverter />}
+
         {/* TAB 3: OUTPUT FILES & ZIP DOWNLOAD */}
         {activeTab === "sync-sinta" && (() => {
           const totalSyncPages = Math.ceil(syncSintaItems.length / syncPageSize) || 1;
@@ -2182,6 +2299,32 @@ export default function ScraperDashboard() {
                   )}
                 </div>
               </div>
+
+              {/* Statistik Status Integrasi Database */}
+              {syncStats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-3.5">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-slate-500 block">Total Jurnal DB 1</span>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">{syncStats.totalJournals.toLocaleString()} Jurnal</p>
+                    <span className="text-[10px] text-slate-400">Database Utama</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-emerald-600 block">Punya Link SINTA</span>
+                    <p className="text-base font-bold text-emerald-700 mt-0.5">{syncStats.withSintaUrl.toLocaleString()} Jurnal</p>
+                    <span className="text-[10px] text-emerald-600/70">sinta_url terisi</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-amber-600 block">Link SINTA Kosong</span>
+                    <p className="text-base font-bold text-amber-700 mt-0.5">{syncStats.withoutSintaUrl.toLocaleString()} Jurnal</p>
+                    <span className="text-[10px] text-amber-600/70">sinta_url bernilai NULL</span>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-indigo-200 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-indigo-600 block">Tersinkronisasi</span>
+                    <p className="text-base font-bold text-indigo-700 mt-0.5">{syncSintaItems.length.toLocaleString()} Link</p>
+                    <span className="text-[10px] text-indigo-600/70">DB 2 (Unik & Siap di-skip)</span>
+                  </div>
+                </div>
+              )}
 
               {/* Content Table / Empty State */}
               {syncSintaItems.length === 0 ? (

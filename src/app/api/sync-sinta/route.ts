@@ -4,6 +4,7 @@ import {
   pullSintaToDb2,
   getSyncSintaList,
   deleteSyncSintaItem,
+  getSyncSintaStats,
 } from '@/lib/sync/sinta';
 
 export const dynamic = 'force-dynamic';
@@ -81,8 +82,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const items = await getSyncSintaList(user.id, role);
+    const stats = await getSyncSintaStats();
     return NextResponse.json({
       items,
+      stats,
       currentUserRole: role,
       isAdmin: role === 2,
     });
@@ -118,12 +121,30 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { pulledCount } = await pullSintaToDb2();
+    const { pulledCount, skippedCount, totalFound, totalDb1Journals, withoutSintaCount } = await pullSintaToDb2();
     const items = await getSyncSintaList(user.id, role);
+    const stats = await getSyncSintaStats();
+
+    let message = '';
+    if (pulledCount > 0 && skippedCount > 0) {
+      message = `Berhasil menarik ${pulledCount} link SINTA baru (${skippedCount} link dilewati karena sudah ada). Total jurnal dengan link SINTA: ${totalFound} (dari ${totalDb1Journals ?? totalFound} data di Database Utama).`;
+    } else if (pulledCount > 0 && skippedCount === 0) {
+      message = `Berhasil menarik seluruh ${pulledCount} link SINTA dari Database Utama.`;
+    } else if (pulledCount === 0 && skippedCount > 0) {
+      message = `Semua data (${skippedCount} link) sudah sinkron di Database Scraper. Catatan: ada ${withoutSintaCount ?? 0} jurnal di Database Utama yang belum memiliki link SINTA (kolom sinta_url bernilai NULL).`;
+    } else {
+      message = 'Tidak ada link SINTA yang ditemukan di Database Utama.';
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Berhasil menarik ${pulledCount} link Sinta dari Database Utama ke Database Scraper.`,
+      message,
+      pulledCount,
+      skippedCount,
+      totalFound,
+      totalDb1Journals,
+      withoutSintaCount,
+      stats,
       items,
       currentUserRole: role,
       isAdmin: true,

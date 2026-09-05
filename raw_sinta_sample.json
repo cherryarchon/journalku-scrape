@@ -1,0 +1,52 @@
+[
+  {
+    "sinta_data": {
+      "editor_url": "https://journal.unnes.ac.id/journals/jpii/about/editorialTeam",
+      "garuda_url": "https://garuda.kemdiktisaintek.go.id/journal/view/37972",
+      "google_scholar_url": "https://scholar.google.co.id/citations?user=NgzWOogAAAAJ&hl=en",
+      "index_type": "SINTA",
+      "issn": "P-ISSN : 23391286 E-ISSN : 20894392",
+      "link": "https://journal.unnes.ac.id/journals/jpii",
+      "name": "Jurnal Pendidikan IPA Indonesia (Indonesian Journal of Science Education)",
+      "publisher": "SCIENCE EDUCATION STUDY PROGRAM, FACULTY OF MATHEMATICS AND NATURAL SCIENCES, UNIVERSITAS NEGERI SEMARANG",
+      "sinta_level": 1,
+      "sinta_url": "https://sinta.kemdiktisaintek.go.id/journals/profile/671"
+    },
+    "garuda_data": {
+      "doi": null,
+      "fields": "Education",
+      "garuda_url": "https://garuda.kemdiktisaintek.go.id/journal/view/37972"
+    },
+    "ojs_url": "https://journal.unnes.ac.id/journals/jpii",
+    "scraped_at": "2026-09-05T06:36:13",
+    "ojs_pages": [
+      {
+        "url": "https://journal.unnes.ac.id/journals/jpii",
+        "external_template_urls": [
+          {
+            "source_page": "https://journal.unnes.ac.id/journals/jpii",
+            "text": "Manuscript Template",
+            "url": "https://drive.google.com/file/d/12rzhPnfWrZb6f-O9mdvU5cNJ7fPuU64H/view?usp=sharing"
+          }
+        ],
+        "text": "Jurnal Pendidikan IPA Indonesia (Indonesian Journal of Science Education) [ P-ISSN 2339-1286 | E-ISSN 2089-4392 ]. Publication Frequency: 4 issues per year (March, June, September, December). APC: Publication fee is IDR 1,500,000. OAI-PMH endpoint available at https://journal.unnes.ac.id/journals/jpii/oai."
+      },
+      {
+        "url": "https://journal.unnes.ac.id/journals/jpii/about/submissions",
+        "external_template_urls": [
+          {
+            "source_page": "https://journal.unnes.ac.id/journals/jpii/about/submissions",
+            "text": "Download Manuscript Template",
+            "url": "https://drive.google.com/file/d/12rzhPnfWrZb6f-O9mdvU5cNJ7fPuU64H/view?usp=sharing"
+          }
+        ],
+        "text": "Submissions. Online submission system. Authors are invited to submit their manuscripts. Author Guidelines and Submission Preparation Checklist. Publication Ethics and Author Fees: Article Processing Charge (APC) is IDR 1,500,000."
+      },
+      {
+        "url": "https://journal.unnes.ac.id/journals/jpii/about/editorialTeam",
+        "external_template_urls": [],
+        "text": "Editorial Team. Editor-in-Chief: Prof. Dr. Parmin Parmin (Universitas Negeri Semarang, Indonesia). Managing Editor: Erna Noor Savitri."
+      }
+    ]
+  }
+]

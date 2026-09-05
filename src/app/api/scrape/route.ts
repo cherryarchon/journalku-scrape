@@ -4,6 +4,7 @@ import { saveScrapeResult } from "@/lib/storage";
 import { validateSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
 import { supabaseAdmin } from "@/lib/auth/db";
 import { checkIfLinkExistsInSyncSinta, insertScrapedLinkToSyncSinta } from "@/lib/sync/sinta";
+import { formatCleanJournalResult } from "@/lib/scraper/transform";
 
 export const maxDuration = 300;
 
@@ -79,13 +80,16 @@ export async function POST(req: NextRequest) {
       };
     }
 
+    // Format hasil scraping menjadi struktur JSON yang rapi
+    const cleanFormattedData = formatCleanJournalResult(responseData);
+
     // Simpan file JSON
-    const saveResult = await saveScrapeResult(responseData, customOutputName);
+    const saveResult = await saveScrapeResult(cleanFormattedData, customOutputName);
 
     // Jika user terautentikasi, catat riwayat ke tabel scrapes di Database 2
     if (user) {
       try {
-        const itemCount = Array.isArray(responseData) ? responseData.length : 1;
+        const itemCount = Array.isArray(cleanFormattedData) ? cleanFormattedData.length : 1;
         await supabaseAdmin.from('scrapes').insert([
           {
             user_id: user.id,
@@ -98,13 +102,13 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         console.warn('Gagal mencatat riwayat scrape di Database 2:', err.message);
       }
+    }
 
-      // Catat link SINTA ke tabel sync_sinta dengan source='scrape' & created_by=user_id
+    // SELALU catat link SINTA ke tabel sync_sinta (source='scrape'), baik login maupun non-login
     try {
-      await insertScrapedLinkToSyncSinta(sintaUrl.trim(), user ? user.id : null);
+      await insertScrapedLinkToSyncSinta(cleanSintaUrl, user?.id || null);
     } catch (err) {
       console.warn('Gagal mencatat link ke sync_sinta:', err);
-    }
     }
 
     return NextResponse.json({
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
       fileName: saveResult.savedFile,
       fileUrl: saveResult.url,
       storageProvider: saveResult.storageProvider,
-      data: responseData,
+      data: cleanFormattedData,
     });
   } catch (error: any) {
     console.error("Gagal melakukan scraping:", error);

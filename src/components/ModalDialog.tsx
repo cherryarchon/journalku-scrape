@@ -327,9 +327,33 @@ export function JsonPreviewModal({
                 </div>
               ) : (
                 parsedData.map((item, idx) => {
-                  const sData = item?.sinta_data || item;
-                  const gData = item?.garuda_data || {};
-                  const ojsPages = item?.ojs_pages || [];
+                  let journalName = "Nama Jurnal Tidak Diketahui";
+                  let sData = item?.sinta_data || item?.sinta || item;
+                  let gData = item?.garuda_data || item?.garuda || {};
+                  let ojsPages = item?.ojs_pages || item?.ojs?.ojs_pages || [];
+                  let sintaUrl = item?.sinta_url || sData?.sinta_url;
+                  let garudaUrl = item?.garuda_url || sData?.garuda_url || gData?.garuda_url;
+                  let ojsUrl = item?.ojs_url || item?.ojs?.ojs_url || sData?.link;
+                  let oaiUrl = item?.ojs?.oai_url || (sData?.link ? `${sData.link.replace(/\/+$/, "")}/oai` : null);
+                  let issn = sData?.issn || (sData?.p_issn || sData?.e_issn ? `${sData?.p_issn || "-"} / ${sData?.e_issn || "-"}` : "-");
+                  let fields = gData?.fields || null;
+
+                  const keys = Object.keys(item || {});
+                  if (keys.length === 1 && item[keys[0]] && (item[keys[0]].sinta || item[keys[0]].garuda || item[keys[0]].ojs)) {
+                    journalName = keys[0];
+                    const inner = item[keys[0]];
+                    sData = inner.sinta || {};
+                    gData = inner.garuda || {};
+                    ojsPages = inner.ojs?.ojs_pages || [];
+                    sintaUrl = inner.sinta?.sinta_url;
+                    garudaUrl = inner.sinta?.garuda_url;
+                    ojsUrl = inner.ojs?.ojs_url || inner.sinta?.link;
+                    oaiUrl = inner.ojs?.oai_url || (inner.sinta?.link ? `${inner.sinta.link.replace(/\/+$/, "")}/oai` : null);
+                    issn = inner.sinta?.issn || "-";
+                    fields = inner.garuda?.fields || null;
+                  } else if (sData?.name) {
+                    journalName = sData.name;
+                  }
 
                   return (
                     <div
@@ -343,7 +367,7 @@ export function JsonPreviewModal({
                           </span>
                           <div>
                             <h4 className="font-extrabold text-sm text-slate-900 leading-tight">
-                              {sData?.name || "Nama Jurnal Tidak Diketahui"}
+                              {journalName}
                             </h4>
                             <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                               <Building className="w-3.5 h-3.5 text-slate-400" />
@@ -362,30 +386,34 @@ export function JsonPreviewModal({
                       {/* Detail Badges & Metrics */}
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                         <div className="p-2.5 rounded-xl bg-[#f8fafc] border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">P-ISSN / E-ISSN</span>
-                          <span className="font-mono text-slate-700 font-semibold">{sData?.p_issn || "-"} / {sData?.e_issn || "-"}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">ISSN</span>
+                          <span className="font-mono text-slate-700 font-semibold truncate block" title={issn}>
+                            {issn}
+                          </span>
                         </div>
                         <div className="p-2.5 rounded-xl bg-[#f8fafc] border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Garuda ID</span>
-                          <span className="font-mono text-slate-700 font-semibold">{gData?.id || sData?.garuda_id || "-"}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Bidang / Fields</span>
+                          <span className="text-slate-700 font-semibold truncate block" title={fields || "-"}>
+                            {fields || "-"}
+                          </span>
                         </div>
                         <div className="p-2.5 rounded-xl bg-[#f8fafc] border border-slate-100">
                           <span className="text-[10px] text-slate-400 font-bold uppercase block">OJS Crawled</span>
                           <span className="font-mono text-sky-700 font-bold">{ojsPages.length} Halaman</span>
                         </div>
                         <div className="p-2.5 rounded-xl bg-[#f8fafc] border border-slate-100">
-                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Pengindeks</span>
-                          <span className="text-slate-700 font-medium truncate block">
-                            {sData?.indexes && Array.isArray(sData.indexes) ? sData.indexes.join(", ") : "-"}
+                          <span className="text-[10px] text-slate-400 font-bold uppercase block">Garuda DOI</span>
+                          <span className="text-slate-700 font-medium truncate block font-mono">
+                            {gData?.doi || "-"}
                           </span>
                         </div>
                       </div>
 
                       {/* External Links */}
                       <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
-                        {item?.sinta_url && (
+                        {sintaUrl && (
                           <a
-                            href={item.sinta_url}
+                            href={sintaUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 font-semibold flex items-center gap-1 transition-colors border border-sky-200"
@@ -396,9 +424,9 @@ export function JsonPreviewModal({
                           </a>
                         )}
 
-                        {(item?.garuda_url || sData?.garuda_url) && (
+                        {garudaUrl && (
                           <a
-                            href={item.garuda_url || sData.garuda_url}
+                            href={garudaUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold flex items-center gap-1 transition-colors border border-emerald-200"
@@ -409,15 +437,27 @@ export function JsonPreviewModal({
                           </a>
                         )}
 
-                        {(item?.ojs_url || sData?.link) && (
+                        {ojsUrl && (
                           <a
-                            href={item.ojs_url || sData.link}
+                            href={ojsUrl}
                             target="_blank"
                             rel="noreferrer"
                             className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold flex items-center gap-1 transition-colors border border-purple-200"
                           >
                             <ExternalLink className="w-3 h-3" />
                             Website OJS
+                          </a>
+                        )}
+
+                        {oaiUrl && (
+                          <a
+                            href={oaiUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold flex items-center gap-1 transition-colors border border-indigo-200 font-mono"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            OAI URL
                           </a>
                         )}
                       </div>

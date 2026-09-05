@@ -1,0 +1,35 @@
+{
+    "name": "Jurnal Teknik Sipil Indonesia",
+    "fields": [
+        "Teknik",
+        "Sains"
+    ],
+    "sinta_level": 2,
+    "scopus_quartile": "Q3",
+    "wos_quartile": null,
+    "apc": 500000,
+    "is_free": false,
+    "currency": "IDR",
+    "frequency": 4,
+    "publish_month": [
+        3,
+        6,
+        9,
+        12
+    ],
+    "e_issn": "1234-5678",
+    "p_issn": "8765-4321",
+    "publisher": "Universitas Indonesia",
+    "link": "https://journal.ui.ac.id",
+    "submission_url": "https://journal.ui.ac.id/submit",
+    "editor_url": "https://journal.ui.ac.id/editorial",
+    "garuda_url": "https://garuda.kemdikbud.go.id/journal/view/1234",
+    "sinta_url": "https://sinta.kemdikbud.go.id/journals/detail?id=1234",
+    "template_url": "https://journal.ui.ac.id/template.docx",
+    "oai_url": "https://journal.ui.ac.id/index.php/jtsi/oai",
+    "estimated_review_min": 30,
+    "estimated_review_max": 90,
+    "submission_status": "open",
+    "submission_deadline": "2025-12-31",
+    "is_published": false
+}
